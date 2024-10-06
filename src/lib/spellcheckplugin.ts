@@ -4,22 +4,20 @@ import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { Node as ProseMirrorNode } from 'prosemirror-model';
 import hash from 'object-hash';
 import { ChangeSet } from 'prosemirror-changeset';
-import { createSuggestionBox } from './suggestionbox.js';
-import { debounce, generateProofreadErrors } from './utils.js';
-
-type Problem = {
-	from: number;
-	to: number;
-	msg: string;
-	shortmsg: string;
-	type: string;
-	replacements: [];
-};
+import { debounce } from './utils.js';
+import type { CreateSuggestionBox, GenerateProofreadErrorsResponse, GetCustomText, Problem } from './types.js';
 
 type CacheText = {
 	problems: Problem[];
 	text: string;
 };
+
+interface SpellPluginState {
+	cacheMap: Map<string, CacheText>;
+	decor: DecorationSet;
+	ignoredErrors: Map<string, boolean>;
+	spellcheckEnabled: boolean;
+}
 
 function generateNodeKey(node: ProseMirrorNode) {
 	return hash({
@@ -34,97 +32,162 @@ function generateErrorKey(error: Problem): string {
 
 const spellcheckkey = new PluginKey('spellCheckPlugin');
 
-async function proofread(text: string): Promise<Problem[]> {
-	console.log('proofreading: ' + text);
-	const response: any = JSON.parse(await generateProofreadErrors(text));
-	const data = response;
-	const errors = data.matches;
-	const problems: Problem[] = [];
-	if (!Array.isArray(errors)) {
-		return [];
-	}
-	for (const error of errors) {
-		problems.push({
-			from: error.offset,
-			to: error.offset + error.length,
-			msg: error.message,
-			shortmsg: error.shortMessage,
-			type: error.type.typeName,
-			replacements: error.replacements
-		});
-	}
-	return problems;
-}
-
-interface SpellPluginState {
-	cacheMap: Map<string, CacheText>;
-	decor: DecorationSet;
-	ignoredErrors: Map<string, boolean>;
-	spellcheckEnabled: boolean;
-}
-
-async function check(doc: ProseMirrorNode, pluginState: SpellPluginState, editorView: EditorView) {
-	const decorations: Decoration[] = [];
-	const processErrors = (errors: any[], offset: number, ignoredErrors: Map<string, boolean>) => {
-		errors.forEach((error) => {
-			const errorKey = generateErrorKey(error);
-			if (!ignoredErrors.has(errorKey)) {
-				const classname = error.type === 'UnknownWord' ? 'spelling-error' : 'spelling-warning';
-				decorations.push(
-					Decoration.inline(
-						error.from + offset,
-						error.to + offset,
-						{ class: classname },
-						{ error, key: errorKey }
-					)
-				);
-			}
-		});
-	};
-
-	const tasks: (() => Promise<void>)[] = [];
-	doc.descendants((node, pos) => {
-		if (!containsOnlyTextNodes(node)) {
-			return true;
-		}
-		tasks.push(async () => {
-			if (node.textContent && node.textContent.length > 1) {
-				const nodeKey = generateNodeKey(node);
-
-				if (!pluginState.cacheMap.has(nodeKey)) {
-					const errors = await proofread(getCustomText(node));
-					pluginState.cacheMap.set(nodeKey, { problems: errors, text: node.textContent });
-				}
-
-				const offset = pos + 1;
-				processErrors(
-					pluginState.cacheMap.get(nodeKey)?.problems || [],
-					offset,
-					pluginState.ignoredErrors
-				);
-			}
-		});
-		return false;
-	});
-
-	for (const task of tasks) {
-		await task();
-	}
-	pluginState.decor = DecorationSet.create(doc, decorations);
-	const tr = editorView.state.tr;
-	tr.setMeta('proofread', pluginState);
-	editorView.dispatch(tr);
-}
-
-const debouncedCheck = debounce(check, 1000);
-
 // Create the spell check plugin
-export function createSpellCheckPlugin() {
+export function createSpellCheckPlugin(
+	debounceTimeMS: number,
+	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse,
+	createSuggestionBox: CreateSuggestionBox,
+	getCustomText?:GetCustomText
+) {
+	const debouncedCheck = debounce(check, debounceTimeMS);
 	let editorview: EditorView = undefined;
+
+	function showSuggestionBox(
+		event: MouseEvent,
+		errorDetails: Problem,
+		view: EditorView,
+		decor: Decoration
+	) {
+		const errorKey = generateErrorKey(errorDetails);
+
+		const app = createSuggestionBox({
+			error: errorDetails,
+			position: { x: event.clientX, y: event.clientY },
+			onReplace: (value: string | any[]) => {
+				const { from, to } = decor;
+				const tr = view.state.tr;
+				tr.replaceWith(from, to, view.state.schema.text(value as string));
+
+				const newSelection = TextSelection.create(tr.doc, from, from + value.length);
+				const pluginState = spellcheckkey.getState(view.state);
+
+				pluginState.decor = pluginState.decor.remove(
+					pluginState.decor
+						.find(from, to)
+						.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
+				);
+				tr.setSelection(newSelection);
+				view.dispatch(tr);
+				app.destroy();
+			},
+			onIgnore: () => {
+				const pluginState = spellcheckkey.getState(view.state);
+				const { from, to } = decor;
+				pluginState.decor = pluginState.decor.remove(
+					pluginState.decor
+						.find(from, to)
+						.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
+				);
+				pluginState.ignoredErrors.set(errorKey, true);
+				const tr = view.state.tr;
+				tr.setMeta('proofread', pluginState);
+				view.dispatch(tr);
+				app.destroy();
+			},
+			onClose: () => {
+				app.destroy();
+			}
+		});
+
+		return app;
+	}
+
+	function containsOnlyTextNodes(node: ProseMirrorNode) {
+		let onlyText = true;
+
+		node.forEach((child) => {
+			if (!child.isText && child.type.name !== 'inline_math') {
+				onlyText = false;
+				return false;
+			}
+		});
+
+		return onlyText;
+	}
+
+	async function proofread(text: string): Promise<Problem[]> {
+		// console.log('proofreading: ' + text);
+		const response = await generateProofreadErrors(text);
+		const data = response;
+		const errors = data.matches;
+		const problems: Problem[] = [];
+		if (!Array.isArray(errors)) {
+			return [];
+		}
+		for (const error of errors) {
+			problems.push({
+				from: error.offset,
+				to: error.offset + error.length,
+				msg: error.message,
+				shortmsg: error.shortMessage,
+				type: error.type.typeName,
+				replacements: error.replacements
+			});
+		}
+		return problems;
+	}
+
+	async function check(
+		doc: ProseMirrorNode,
+		pluginState: SpellPluginState,
+		editorView: EditorView
+	) {
+		const decorations: Decoration[] = [];
+		const processErrors = (errors: any[], offset: number, ignoredErrors: Map<string, boolean>) => {
+			errors.forEach((error) => {
+				const errorKey = generateErrorKey(error);
+				if (!ignoredErrors.has(errorKey)) {
+					const classname = error.type === 'UnknownWord' ? 'spelling-error' : 'spelling-warning';
+					decorations.push(
+						Decoration.inline(
+							error.from + offset,
+							error.to + offset,
+							{ class: classname },
+							{ error, key: errorKey }
+						)
+					);
+				}
+			});
+		};
+
+		const tasks: (() => Promise<void>)[] = [];
+		doc.descendants((node, pos) => {
+			if (!containsOnlyTextNodes(node)) {
+				return true;
+			}
+			tasks.push(async () => {
+				if (node.textContent && node.textContent.length > 1) {
+					const nodeKey = generateNodeKey(node);
+
+					if (!pluginState.cacheMap.has(nodeKey)) {
+						const errors = await proofread(getCustomText?.(node) ?? getDefaultCustomText(node));
+						pluginState.cacheMap.set(nodeKey, { problems: errors, text: node.textContent });
+					}
+
+					const offset = pos + 1;
+					processErrors(
+						pluginState.cacheMap.get(nodeKey)?.problems || [],
+						offset,
+						pluginState.ignoredErrors
+					);
+				}
+			});
+			return false;
+		});
+
+		for (const task of tasks) {
+			await task();
+		}
+		pluginState.decor = DecorationSet.create(doc, decorations);
+		const tr = editorView.state.tr;
+		tr.setMeta('proofread', pluginState);
+		editorView.dispatch(tr);
+	}
+
 	return new Plugin<SpellPluginState>({
 		key: spellcheckkey,
 		view(view) {
-			editorview = view
+			editorview = view;
 			return {};
 		},
 		state: {
@@ -133,7 +196,7 @@ export function createSpellCheckPlugin() {
 					cacheMap: new Map<string, CacheText>(),
 					ignoredErrors: new Map<string, boolean>(),
 					decor: DecorationSet.empty,
-					spellcheckEnabled: true,
+					spellcheckEnabled: true
 				};
 			},
 			apply(tr: Transaction, old: SpellPluginState, oldState, newState) {
@@ -247,85 +310,21 @@ function getOldNodes(transactions: Transaction[], prevState: EditorState) {
 	return oldNodes;
 }
 
-function showSuggestionBox(
-	event: MouseEvent,
-	errorDetails: Problem,
-	view: EditorView,
-	decor: Decoration
-) {
-	const errorKey = generateErrorKey(errorDetails);
-
-	const app = createSuggestionBox({
-		error: errorDetails,
-		position: { x: event.clientX, y: event.clientY },
-		onReplace: (value: string | any[]) => {
-			const { from, to } = decor;
-			const tr = view.state.tr;
-			tr.replaceWith(from, to, view.state.schema.text(value as string));
-
-			const newSelection = TextSelection.create(tr.doc, from, from + value.length);
-			const pluginState = spellcheckkey.getState(view.state);
-
-			pluginState.decor = pluginState.decor.remove(
-				pluginState.decor
-					.find(from, to)
-					.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
-			);
-			tr.setSelection(newSelection);
-			view.dispatch(tr);
-			app.destroy();
-		},
-		onIgnore: () => {
-			const pluginState = spellcheckkey.getState(view.state);
-			const { from, to } = decor;
-			pluginState.decor = pluginState.decor.remove(
-				pluginState.decor
-					.find(from, to)
-					.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
-			);
-			pluginState.ignoredErrors.set(errorKey, true);
-			const tr = view.state.tr;
-			tr.setMeta('proofread', pluginState);
-			view.dispatch(tr);
-			app.destroy();
-		},
-		onClose: () => {
-			app.destroy();
-		}
-	});
-
-	return app;
-}
-
-function containsOnlyTextNodes(node: ProseMirrorNode) {
-	let onlyText = true;
-
-	node.forEach((child) => {
-		if (!child.isText && child.type.name !== 'inline_math') {
-			onlyText = false;
-			return false;
-		}
-	});
-
-	return onlyText;
-}
-
-function getCustomText(node: ProseMirrorNode) {
+//this is to account for the 2 extra index in prosemirror inline node
+function getDefaultCustomText(node: ProseMirrorNode) {
 	let textContent = '';
 
 	node.content.forEach((child) => {
-		if (child.type.name === 'inline_math') {
-			textContent += `$${child.textContent}$`;
-		} else if (child.type.name === 'citation') {
-			textContent += `[${child.textContent}]`;
-		} else if (child.isText) {
+		if (child.isText) {
 			textContent += child.text;
+		} else if (child.isInline) {
+			textContent += `$${getDefaultCustomText(child)}$`;
 		} else {
-			textContent += getCustomText(child);
+			textContent += getDefaultCustomText(child);
 		}
 	});
-
 	return textContent;
 }
+
 
 export default createSpellCheckPlugin;

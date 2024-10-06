@@ -4,8 +4,13 @@ import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { Node as ProseMirrorNode } from 'prosemirror-model';
 import hash from 'object-hash';
 import { ChangeSet } from 'prosemirror-changeset';
-import { debounce } from './utils.js';
-import type { CreateSuggestionBox, GenerateProofreadErrorsResponse, GetCustomText, Problem } from './types.js';
+import { createSpellCheckEnabledStore, debounce } from './utils.js';
+import type {
+	CreateSuggestionBox,
+	GenerateProofreadErrorsResponse,
+	GetCustomText,
+	Problem
+} from './types.js';
 
 type CacheText = {
 	problems: Problem[];
@@ -30,14 +35,14 @@ function generateErrorKey(error: Problem): string {
 	return keyContent;
 }
 
-const spellcheckkey = new PluginKey('spellCheckPlugin');
+const spellcheckkey = new PluginKey('proofreadPlugin');
 
-// Create the spell check plugin
-export function createSpellCheckPlugin(
+export function createProofreadPlugin(
 	debounceTimeMS: number,
 	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse,
 	createSuggestionBox: CreateSuggestionBox,
-	getCustomText?:GetCustomText
+	getSpellCheckEnabled: ReturnType<typeof createSpellCheckEnabledStore>,
+	getCustomText?: GetCustomText
 ) {
 	const debouncedCheck = debounce(check, debounceTimeMS);
 	let editorview: EditorView = undefined;
@@ -188,7 +193,26 @@ export function createSpellCheckPlugin(
 		key: spellcheckkey,
 		view(view) {
 			editorview = view;
-			return {};
+			//account for the inital element in the editor
+			if (getSpellCheckEnabled.get()) {
+				setTimeout(() => {
+					const tr = view.state.tr;
+					tr.setMeta('forceProofread', true);
+					view.dispatch(tr);
+				}, 100);
+			}
+
+			const unsubscribe = getSpellCheckEnabled.subscribe((value) => {
+				const spellcheckEnabled = value;
+				const tr = view.state.tr;
+				tr.setMeta('updateSpellcheckEnabled', spellcheckEnabled);
+				view.dispatch(tr);
+			});
+			return {
+				destroy() {
+					unsubscribe();
+				}
+			};
 		},
 		state: {
 			init() {
@@ -196,7 +220,7 @@ export function createSpellCheckPlugin(
 					cacheMap: new Map<string, CacheText>(),
 					ignoredErrors: new Map<string, boolean>(),
 					decor: DecorationSet.empty,
-					spellcheckEnabled: true
+					spellcheckEnabled: getSpellCheckEnabled.get()
 				};
 			},
 			apply(tr: Transaction, old: SpellPluginState, oldState, newState) {
@@ -220,7 +244,9 @@ export function createSpellCheckPlugin(
 					return asyncDecros;
 				}
 
-				if (!tr.docChanged && spellcheckEnabled === old.spellcheckEnabled) return old;
+				const forceProofread = tr.getMeta('forceProofread');
+
+				if (!tr.docChanged && spellcheckEnabled === old.spellcheckEnabled && !forceProofread) return old;
 
 				getOldNodes([tr], oldState).forEach((changednode) => {
 					old.cacheMap.delete(generateNodeKey(changednode.node));
@@ -282,7 +308,6 @@ export function createSpellCheckPlugin(
 }
 
 // Helper functions
-
 function getOldNodes(transactions: Transaction[], prevState: EditorState) {
 	let changeSet = ChangeSet.create(prevState.doc);
 
@@ -326,5 +351,4 @@ function getDefaultCustomText(node: ProseMirrorNode) {
 	return textContent;
 }
 
-
-export default createSpellCheckPlugin;
+export default createProofreadPlugin;

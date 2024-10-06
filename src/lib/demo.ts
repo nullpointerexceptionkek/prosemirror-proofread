@@ -29,13 +29,10 @@ export const generateProofreadErrors = async (input: string) => {
 };
 
 export function createSuggestionBox({ error, position, onReplace, onIgnore, onClose }) {
-	// Remove any existing suggestion box
-	const existingBox = document.querySelector('.proofread-suggestion');
+    const existingBox = document.querySelector('.proofread-suggestion');
 	if (existingBox) {
 		existingBox.remove();
 	}
-
-	// Create a container for the suggestion box
 	const container = document.createElement('div');
 	container.className = 'proofread-suggestion';
 	container.style.position = 'fixed';
@@ -48,8 +45,6 @@ export function createSuggestionBox({ error, position, onReplace, onIgnore, onCl
 	container.style.maxWidth = '20rem';
 	container.style.left = `${position.x}px`;
 	container.style.top = `${position.y + 15}px`;
-
-	// Create inner HTML for the suggestion box
 	const content = document.createElement('div');
 	content.style.display = 'flex';
 	content.style.justifyContent = 'space-between';
@@ -77,8 +72,6 @@ export function createSuggestionBox({ error, position, onReplace, onIgnore, onCl
 	content.appendChild(message);
 	content.appendChild(closeButton);
 	container.appendChild(content);
-
-	// Add replacement suggestions if available
 	if (error.replacements && error.replacements.length > 0) {
 		error.replacements.slice(0, 3).forEach((replacement) => {
 			const replaceButton = document.createElement('button');
@@ -104,8 +97,6 @@ export function createSuggestionBox({ error, position, onReplace, onIgnore, onCl
 		noReplacement.textContent = 'No replacements available';
 		container.appendChild(noReplacement);
 	}
-
-	// Add ignore button
 	const ignoreButton = document.createElement('button');
 	ignoreButton.style.backgroundColor = '#6B7280';
 	ignoreButton.style.color = 'white';
@@ -122,8 +113,6 @@ export function createSuggestionBox({ error, position, onReplace, onIgnore, onCl
 	});
 
 	container.appendChild(ignoreButton);
-
-	// Append the container to the body
 	document.body.appendChild(container);
 
 	return {

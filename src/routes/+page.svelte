@@ -8,9 +8,10 @@
 	import { exampleSetup } from 'prosemirror-example-setup';
 	import 'prosemirror-example-setup/style/style.css';
 	import 'prosemirror-menu/style/menu.css';
-	import createSpellCheckPlugin from '$lib/spellcheckplugin.js';
+	import createSpellCheckPlugin from '$lib/proofreadPlugin.js';
 	import '$lib/suggestion.css';
 	import { createSuggestionBox, generateProofreadErrors } from '$lib/demo.js';
+	import { createSpellCheckEnabledStore } from '$lib/utils.js';
 
 	let editorContainer: HTMLDivElement | null = null;
 	let content: HTMLElement | null = null;
@@ -19,24 +20,40 @@
 		marks: schema.spec.marks
 	});
 
+	let spellCheckEnabledStore = createSpellCheckEnabledStore(() => true);
+	let spellCheckEnabled = spellCheckEnabledStore.get();
+
 	onMount(() => {
 		if (editorContainer && content) {
-			let editorview = new EditorView(editorContainer, {
+			new EditorView(editorContainer, {
 				state: EditorState.create({
 					doc: DOMParser.fromSchema(mySchema).parse(content),
 					plugins: [
 						...exampleSetup({ schema: mySchema }),
-						createSpellCheckPlugin(1000, generateProofreadErrors as never, createSuggestionBox)
+						createSpellCheckPlugin(
+							1000,
+							generateProofreadErrors as never,
+							createSuggestionBox,
+							spellCheckEnabledStore
+						)
 					]
 				})
 			});
 		}
+
+		spellCheckEnabledStore.subscribe((enabled) => {
+			spellCheckEnabled = enabled;
+		});
 	});
+
+	function toggleSpellCheck() {
+		spellCheckEnabledStore.set(!spellCheckEnabled);
+	}
 </script>
 
 <div id="content" bind:this={content} style="display: none">
 	<p>
-		This is a test of the ProseMirror editor in Svelte. It have many spellng and gramar mistakes to
+		This is a test of the ProseMirror editor. It have many spellng and gramar mistakes to
 		test the spellcheck plugin.
 	</p>
 	<p>
@@ -50,6 +67,10 @@
 </div>
 
 <div spellcheck="false" bind:this={editorContainer}></div>
+
+<button on:click={toggleSpellCheck}>
+	{spellCheckEnabled ? 'Disable Spell Check' : 'Enable Spell Check'}
+</button>
 
 <style>
 	:global(.ProseMirror) {

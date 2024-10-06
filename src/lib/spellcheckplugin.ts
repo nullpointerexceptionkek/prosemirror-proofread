@@ -2,11 +2,10 @@
 import { EditorState, Plugin, PluginKey, TextSelection, Transaction } from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { Node as ProseMirrorNode } from 'prosemirror-model';
-import { debounce } from 'lodash';
 import hash from 'object-hash';
 import { ChangeSet } from 'prosemirror-changeset';
 import { createSuggestionBox } from './suggestionbox.js';
-import { generateProofreadErrors } from './utils.js';
+import { debounce, generateProofreadErrors } from './utils.js';
 
 type Problem = {
 	from: number;
@@ -37,8 +36,7 @@ const spellcheckkey = new PluginKey('spellCheckPlugin');
 
 async function proofread(text: string): Promise<Problem[]> {
 	console.log('proofreading: ' + text);
-	const response:any = await generateProofreadErrors(text);
-
+	const response: any = JSON.parse(await generateProofreadErrors(text));
 	const data = response;
 	const errors = data.matches;
 	const problems: Problem[] = [];
@@ -58,7 +56,6 @@ async function proofread(text: string): Promise<Problem[]> {
 	return problems;
 }
 
-// Interface for spell plugin state
 interface SpellPluginState {
 	cacheMap: Map<string, CacheText>;
 	decor: DecorationSet;
@@ -119,19 +116,24 @@ async function check(doc: ProseMirrorNode, pluginState: SpellPluginState, editor
 	editorView.dispatch(tr);
 }
 
-const debouncedCheck = debounce(check, 5000);
+const debouncedCheck = debounce(check, 1000);
 
 // Create the spell check plugin
-export function createSpellCheckPlugin(editorView: EditorView) {
+export function createSpellCheckPlugin() {
+	let editorview: EditorView = undefined;
 	return new Plugin<SpellPluginState>({
 		key: spellcheckkey,
+		view(view) {
+			editorview = view
+			return {};
+		},
 		state: {
 			init() {
 				return {
 					cacheMap: new Map<string, CacheText>(),
 					ignoredErrors: new Map<string, boolean>(),
 					decor: DecorationSet.empty,
-					spellcheckEnabled: true
+					spellcheckEnabled: true,
 				};
 			},
 			apply(tr: Transaction, old: SpellPluginState, oldState, newState) {
@@ -178,7 +180,7 @@ export function createSpellCheckPlugin(editorView: EditorView) {
 						ignoredErrors: newIgnoredErrors,
 						spellcheckEnabled: spellcheckEnabled
 					},
-					editorView
+					editorview
 				);
 
 				return {

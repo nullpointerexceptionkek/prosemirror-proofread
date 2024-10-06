@@ -1,0 +1,13 @@
+/* Error styling - red underline and highlight */
+.spelling-error {
+    background-color: #ffdddd;
+    border-bottom: 1px solid #ff0000;
+  }
+  
+  /* Warning styling - yellow underline and highlight */
+  .spelling-warning {
+    background-color: #ffeedd;
+    border-bottom: 1px solid #ff9900;
+  }
+  
+

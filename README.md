@@ -1,6 +1,6 @@
 # ProseMirror-proofread
 
-**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell checking services. In the example, example integration with LanguageTool and an example UI are provided, which can be a good starting point.
+**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell-checking services. In the example, example integration with LanguageTool and an example UI are provided, which can be a good starting point.
 
 
 The main difficulty of creating a spell-checking library for ProseMirror, which handles ProseMirror's particular index. Most spell-checking services are designed to handle plain text, and mapping between a rich ProseMirror document to plain text and vice versa is complex.
@@ -10,7 +10,7 @@ To do so, the library checks each node individually and caches the results. As f
 
 ## Features
 
-- **Spell Checking and Grammar Correction**: Identifies spelling errors and grammatical mistakes and suggests potential corrections. By default, ProseMirror-proofread is designed to work with LanguageTool, but integrating with other tools is also possible.
+- **Spell Checking and Grammar Correction**: This depends on your chosen spell check provider. This library does not handle spellcheck by itself; it handles the integration of spellcheck services. You will need to override the `generateProofreadErrors` function. This library works highly well with LanguageTool but also works with other services.
 - **Debounced Spell Check Requests**: Customizable debounce to control the frequency of error generation, ensuring smooth performance.
 - **Customizable Suggestion Box**: The library provides the ability to easily customize the UI for error suggestions.
 - **Reactive Spell Check Enable/Disable**: Built-in functionality to easily toggle spell-checking on or off.

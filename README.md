@@ -19,6 +19,10 @@ This library is designed to work on all frameworks.
 
 ## Usage
 
+```
+npm i prosemirror-proofread
+```
+
 ### Getting Started
 
 To use **ProseMirror-proofread**, simply import the main plugin and integrate it with your ProseMirror setup. This library provides essential tools to create a high-quality proofreading experience within your editor.

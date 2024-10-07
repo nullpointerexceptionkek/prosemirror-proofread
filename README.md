@@ -1,10 +1,16 @@
 # ProseMirror-proofread
 
-**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you to integrate with a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell checking services. In the example, example integration with LanguageTool and an example UI are provided, which can be a good starting point.
+**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell checking services. In the example, example integration with LanguageTool and an example UI are provided, which can be a good starting point.
+
+
+The main difficulty of creating a spell-checking library for ProseMirror, which handles ProseMirror's particular index. Most spell-checking services are designed to handle plain text, and mapping between a rich ProseMirror document to plain text and vice versa is complex.
+
+To do so, the library checks each node individually and caches the results. As for inline nodes, the library will add filler characters by default. However, this might need to be overridden for some particular inline nodes.
+
 
 ## Features
 
-- **Spell Checking and Grammar Correction**: Identifies spelling errors, grammatical mistakes, and suggests potential corrections. By default, ProseMirror-proofread is designed to work with LanguageTool, but integrating with other tool is also possible.
+- **Spell Checking and Grammar Correction**: Identifies spelling errors and grammatical mistakes and suggests potential corrections. By default, ProseMirror-proofread is designed to work with LanguageTool, but integrating with other tools is also possible.
 - **Debounced Spell Check Requests**: Customizable debounce to control the frequency of error generation, ensuring smooth performance.
 - **Customizable Suggestion Box**: The library provides the ability to easily customize the UI for error suggestions.
 - **Reactive Spell Check Enable/Disable**: Built-in functionality to easily toggle spell-checking on or off.
@@ -58,7 +64,7 @@ This API reference provides details on how to implement the core proofreading fu
 
 
 - **debounceTimeMS** (number): Time delay(ms) before processing the text to reduce redundant calls.
-- **generateProofreadErrors** (function): function that calls your custom proofreading service.
+- **generateProofreadErrors** (function): the function that calls your custom proofreading service.
 - **createSuggestionBox** (function): your custom suggestionbox UI.
 - **getSpellCheckEnabled**: Acts like a Svelte Store, reactively responds to toggle on and off.
 - **getCustomText** (optional): You might need to override this if you have edge cases regarding inline nodes.
@@ -171,3 +177,5 @@ createSuggestionBox({
 	}
 });
 ```
+
+# MIT License 

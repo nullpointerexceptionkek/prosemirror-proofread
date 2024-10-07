@@ -1,4 +1,6 @@
 # ProseMirror-proofread
+![NPM Version](https://img.shields.io/npm/v/prosemirror-proofread) ![Static Badge](https://img.shields.io/badge/License-MIT-blue)
+
 
 **ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell-checking services. In the example, an example integration with LanguageTool and an example UI are provided, which can be a good starting point.
 

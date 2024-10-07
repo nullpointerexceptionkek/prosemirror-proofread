@@ -1,13 +1,39 @@
-/* Error styling - red underline and highlight */
 .spelling-error {
-    background-color: #ffdddd;
-    border-bottom: 1px solid #ff0000;
-  }
-  
-  /* Warning styling - yellow underline and highlight */
-  .spelling-warning {
-    background-color: #ffeedd;
-    border-bottom: 1px solid #ff9900;
-  }
-  
+	background-color: #ffdddd;
+	border-bottom: 1px solid #ff0000;
+	animation: spellingErrorFadeIn 0.5s ease forwards;
+}
 
+.spelling-warning {
+	background-color: #ffeedd;
+	border-bottom: 1px solid #ff9900;
+	animation: spellingWarningFadeIn 0.5s ease forwards;
+}
+
+@keyframes spellingErrorFadeIn {
+	0% {
+		background-color: transparent;
+		border-bottom: 1px solid transparent;
+	}
+	100% {
+		background-color: #ffdddd;
+		border-bottom: 1px solid #ff0000;
+	}
+}
+
+@keyframes spellingWarningFadeIn {
+	0% {
+		background-color: transparent;
+		border-bottom: 1px solid transparent;
+	}
+	100% {
+		background-color: #ffeedd;
+		border-bottom: 1px solid #ff9900;
+	}
+}
+
+.spelling-error:hover,
+.spelling-warning:hover {
+	background-color: #ffcccc;
+	transition: background-color 0.3s ease;
+}

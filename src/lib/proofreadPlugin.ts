@@ -55,9 +55,11 @@ export function createProofreadPlugin(
 	) {
 		const errorKey = generateErrorKey(errorDetails);
 
+		const rect = (event.target as HTMLElement).getBoundingClientRect();
+
 		const app = createSuggestionBox({
 			error: errorDetails,
-			position: { x: event.clientX, y: event.clientY },
+			position: { x: rect.left, y: rect.bottom },
 			onReplace: (value: string | any[]) => {
 				const { from, to } = decor;
 				const tr = view.state.tr;

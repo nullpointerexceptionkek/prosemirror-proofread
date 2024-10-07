@@ -1,12 +1,14 @@
 # ProseMirror-proofread
 
-**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell-checking services. In the example, example integration with LanguageTool and an example UI are provided, which can be a good starting point.
+**ProseMirror-proofread** is a plugin for adding spell-check and grammar-checking capabilities to your ProseMirror editor. This library helps you integrate a variety of spell-check services, including LanguageTool. This library is designed to handle caching, ignore, and pop-ups. It is up to the developer's responsibility to implement UI and spell-checking services. In the example, an example integration with LanguageTool and an example UI are provided, which can be a good starting point.
 
 
 The main difficulty of creating a spell-checking library for ProseMirror, which handles ProseMirror's particular index. Most spell-checking services are designed to handle plain text, and mapping between a rich ProseMirror document to plain text and vice versa is complex.
 
 To do so, the library checks each node individually and caches the results. As for inline nodes, the library will add filler characters by default. However, this might need to be overridden for some particular inline nodes.
 
+
+This library is designed to work on all frameworks.
 
 ## Features
 

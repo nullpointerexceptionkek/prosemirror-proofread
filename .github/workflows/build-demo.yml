@@ -30,7 +30,7 @@ jobs:
         env:
           BASE_PATH: '/prosemirror-proofread'
         run: |
-          npm run build
+          npm run build:demo
           touch build/.nojekyll
 
       - name: Upload Artifacts

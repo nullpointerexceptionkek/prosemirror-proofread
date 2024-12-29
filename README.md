@@ -48,7 +48,7 @@ import { Schema } from 'prosemirror-model';
 import { schema } from 'prosemirror-schema-basic';
 import { addListNodes } from 'prosemirror-schema-list';
 import { exampleSetup } from 'prosemirror-example-setup';
-import createProofreadPlugin from 'prosemirror-proofread';
+import { createProofreadPlugin } from 'prosemirror-proofread';
 
 const mySchema = new Schema({
 	nodes: addListNodes(schema.spec.nodes, 'paragraph block*', 'block'),

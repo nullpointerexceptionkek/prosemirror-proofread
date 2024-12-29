@@ -90,7 +90,7 @@ This API reference provides details on how to implement the core proofreading fu
 
 ## createSpellCheckEnabledStore
 
-`createSpellCheckEnabledStore(initialValue: boolean)`
+`createSpellCheckEnabledStore(initialValue: () => boolean)`
 
 ### Example
 

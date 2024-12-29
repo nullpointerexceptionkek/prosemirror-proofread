@@ -1,6 +1,6 @@
 {
 	"name": "prosemirror-proofread",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -24,7 +24,8 @@
 			"import": "./dist/index.js",
 			"require": "./dist/index.cjs",
 			"types": "./dist/index.d.ts"
-		}
+		},
+		"./suggestion.css": "./dist/suggestion.css"
 	},
 	"files": [
 		"dist",

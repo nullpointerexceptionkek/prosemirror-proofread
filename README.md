@@ -34,6 +34,13 @@ To use **ProseMirror-proofread**, simply import the main plugin and integrate it
 
 Example setup for integrating **ProseMirror-proofread**:
 
+We offer a [React example](demos/reacttest/src/App.tsx)
+
+> **IMPORTANT**: Make sure to import the CSS for suggestions.
+> ```typescript
+> import 'prosemirror-proofread/suggestions.css';
+> ```
+
 ```typescript
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
@@ -88,7 +95,7 @@ This API reference provides details on how to implement the core proofreading fu
 ### Example
 
 ```typescript
-const spellCheckStore = createSpellCheckEnabledStore(true);
+const spellCheckStore = createSpellCheckEnabledStore(()=>{true});
 spellCheckStore.set(false); // Disables spell check
 console.log(spellCheckStore.get()); // Outputs: false
 ```

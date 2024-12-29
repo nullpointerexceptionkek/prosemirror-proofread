@@ -4,8 +4,6 @@ import './App.css';
 import 'prosemirror-example-setup/style/style.css';
 import 'prosemirror-menu/style/menu.css';
 import 'prosemirror-proofread/suggestion.css';
-
-// ProseMirror + prosemirror-proofread imports
 import { EditorState } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { schema } from 'prosemirror-schema-basic';
@@ -68,13 +66,10 @@ function App() {
       spellCheckStore,
     );
 
-    // 7) Create an initial EditorState
     const state = EditorState.create({
       schema: mySchema,
       plugins: [...exampleSetup({ schema: mySchema }), proofreadPlugin]
     });
-
-    // 8) Create the EditorView
     const view = new EditorView(editorContainer.current, { state });
 
     return () => {

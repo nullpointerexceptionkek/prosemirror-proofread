@@ -139,14 +139,14 @@ Please note that this library supports the LangaugeTool output by default, if yo
       message: "Possible spelling mistake found.",
       shortMessage: "Spelling error",
       type: { typeName: "UnknownWord" },
-      replacements: ["This"]
+      replacements: [{"value":"This"}] // The default suggestion box requires this format
     },
     {
       offset: 11,
       length: 6,
       message: "Possible spelling mistake found.",
       type: { typeName: "UnknownWord" },
-      replacements: ["example"]
+      replacements: ["example"] // However, if you make a custom suggestion box, you can format it however you want.
     }
   ]
 }

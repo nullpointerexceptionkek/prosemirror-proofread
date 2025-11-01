@@ -103,9 +103,9 @@ console.log(spellCheckStore.get()); // Outputs: false
 
 ## generateProofreadErrors
 
-`generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse`
+`generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse | Promise<GenerateProofreadErrorsResponse>`
 
-The `generateProofreadErrors` function takes a block of text as input and returns information about any identified errors, including their positions, type, and potential corrections.
+The `generateProofreadErrors` function takes a block of text as input and returns (or returns a Promise that resolves to) information about any identified errors, including their positions, type, and potential corrections. This function can be either synchronous or asynchronous.
 
 ### Parameters
 

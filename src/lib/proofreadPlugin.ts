@@ -39,7 +39,7 @@ const spellcheckkey = new PluginKey('proofreadPlugin');
 
 export function createProofreadPlugin(
 	debounceTimeMS: number,
-	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse,
+	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse | Promise<GenerateProofreadErrorsResponse>,
 	createSuggestionBox: CreateSuggestionBox,
 	getSpellCheckEnabled: ReturnType<typeof createSpellCheckEnabledStore>,
 	getCustomText?: GetCustomText

@@ -42,7 +42,8 @@ export function createProofreadPlugin(
 	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse | Promise<GenerateProofreadErrorsResponse>,
 	createSuggestionBox: CreateSuggestionBox,
 	getSpellCheckEnabled: ReturnType<typeof createSpellCheckEnabledStore>,
-	getCustomText?: GetCustomText
+	getCustomText?: GetCustomText,
+	useCustomCSS?: boolean
 ) {
 	const debouncedCheck = debounce(check, debounceTimeMS);
 	let editorview: EditorView = undefined;
@@ -144,7 +145,9 @@ export function createProofreadPlugin(
 			errors.forEach((error) => {
 				const errorKey = generateErrorKey(error);
 				if (!ignoredErrors.has(errorKey)) {
-					const classname = error.type === 'UnknownWord' ? 'spelling-error' : 'spelling-warning';
+					const classname = useCustomCSS 
+						? `proofread-${error.type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+						: error.type === 'UnknownWord' ? 'spelling-error' : 'spelling-warning';
 					decorations.push(
 						Decoration.inline(
 							error.from + offset,

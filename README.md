@@ -79,7 +79,7 @@ This API reference provides details on how to implement the core proofreading fu
 
 ## createProofreadPlugin
 
-`createProofreadPlugin(debounceTimeMS, generateProofreadErrors, createSuggestionBox, getSpellCheckEnabled, getCustomText?)`
+`createProofreadPlugin(debounceTimeMS, generateProofreadErrors, createSuggestionBox, getSpellCheckEnabled, getCustomText?, useCustomCSS?)`
 
 
 - **debounceTimeMS** (number): Time delay(ms) before processing the text to reduce redundant calls.
@@ -87,6 +87,7 @@ This API reference provides details on how to implement the core proofreading fu
 - **createSuggestionBox** (function): your custom suggestionbox UI.
 - **getSpellCheckEnabled**: Acts like a Svelte Store, reactively responds to toggle on and off.
 - **getCustomText** (optional): You might need to override this if you have edge cases regarding inline nodes.
+- **useCustomCSS** (optional boolean): When `true`, uses `proofread-{errortype}` class naming convention instead of default `spelling-error`/`spelling-warning`. Default: `false`
 
 
 ## createSpellCheckEnabledStore
@@ -195,6 +196,75 @@ createSuggestionBox({
 		console.log('Closed the suggestion box.');
 	}
 });
+```
+
+## Custom CSS Class Names
+
+By default, the plugin uses two CSS classes for styling errors:
+- `spelling-error` for errors with type `'UnknownWord'`
+- `spelling-warning` for all other error types
+
+### Using Custom CSS (`useCustomCSS: true`)
+
+When you set `useCustomCSS` to `true`, the plugin automatically generates class names based on the error type using the pattern: `proofread-{errortype}`
+
+The error type is converted to lowercase and non-alphanumeric characters are replaced with hyphens.
+
+#### Examples:
+
+| Error Type | Generated Class Name |
+|-----------|---------------------|
+| `UnknownWord` | `proofread-unknownword` |
+| `GRAMMAR` | `proofread-grammar` |
+| `TYPO` | `proofread-typo` |
+| `Misspelling_Error` | `proofread-misspelling-error` |
+
+#### Usage Example:
+
+```typescript
+const plugin = createProofreadPlugin(
+	1000,
+	generateProofreadErrors,
+	createSuggestionBox,
+	spellCheckStore,
+	undefined,  // getCustomText
+	true        // useCustomCSS - enable custom class naming
+);
+```
+
+#### Custom Styling:
+
+Create your own CSS to style the errors:
+
+```css
+/* Style spelling errors */
+.proofread-unknownword {
+	background-color: #ffe0e0;
+	border-bottom: 2px dotted red;
+}
+
+/* Style grammar errors */
+.proofread-grammar {
+	background-color: #e0f0ff;
+	border-bottom: 2px dotted blue;
+}
+
+/* Style any other error type */
+.proofread-typo {
+	background-color: #fff0e0;
+	border-bottom: 2px dotted orange;
+}
+
+/* Add hover effects */
+[class^="proofread-"]:hover {
+	opacity: 0.8;
+	cursor: pointer;
+}
+```
+
+**Note:** When `useCustomCSS` is `false` (default), you should import the default CSS:
+```typescript
+import 'prosemirror-proofread/suggestion.css';
 ```
 
 # MIT License 

@@ -9,7 +9,8 @@ import type {
 	CreateSuggestionBox,
 	GenerateProofreadErrorsResponse,
 	GetCustomText,
-	Problem
+	Problem,
+	Segment
 } from './types.js';
 
 type CacheText = {
@@ -35,11 +36,86 @@ function generateErrorKey(error: Problem): string {
 	return keyContent;
 }
 
+/**
+ * Creates non-overlapping segments based on overlapping errors.
+ * https://github.com/remirror/remirror/blob/next/packages/%40remirror/extension-annotation/src/segments.ts
+ * Adapted from Remirror's toSegments function to handle ProseMirror decorations.
+ * This allows multiple errors to be displayed correctly without decoration conflicts.
+ */
+function toSegments(errors: Problem[]): Segment[] {
+	interface Item {
+		type: 'start' | 'end';
+		error: Problem;
+		id: string;
+	}
+
+	const segments: Segment[] = [];
+	const positionMap: Map<number, Item[]> = new Map();
+
+	// Build position map with start and end events for each error
+	for (const error of errors) {
+		const id = generateErrorKey(error);
+		const currentFrom = positionMap.get(error.from) ?? [];
+		const currentTo = positionMap.get(error.to) ?? [];
+
+		positionMap.set(error.from, [...currentFrom, { type: 'start', error, id }]);
+		positionMap.set(error.to, [...currentTo, { type: 'end', error, id }]);
+	}
+
+	// Sort positions from smallest to largest
+	const sortedPositions = [...positionMap.entries()].sort(([a], [b]) => a - b);
+
+	// Track currently active errors
+	let activeErrors: Problem[] = [];
+	let from = 0;
+
+	for (const [to, items] of sortedPositions) {
+		const startErrors = items.filter((item) => item.type === 'start').map((item) => item.error);
+		const endIds = new Set(items.filter((item) => item.type === 'end').map((item) => item.id));
+
+		// Create segment for currently active errors (if any)
+		if (activeErrors.length > 0) {
+			segments.push({ from, to, errors: activeErrors });
+		}
+
+		// Update from position for next segment
+		from = to;
+
+		// Update active errors: add new starts and remove ends
+		activeErrors = [...activeErrors, ...startErrors].filter(
+			(error) => !endIds.has(generateErrorKey(error))
+		);
+	}
+
+	return segments;
+}
+
 const spellcheckkey = new PluginKey('proofreadPlugin');
+
+/**
+ * Invalidates the cache for the proofread plugin, forcing a re-check.
+ * Useful after adding words to a custom dictionary or changing proofreading rules.
+ *
+ * @param view - The EditorView instance
+ */
+export function invalidateProofreadCache(view: EditorView) {
+	const pluginState = spellcheckkey.getState(view.state);
+	if (pluginState) {
+		// Clear the cache
+		pluginState.cacheMap.clear();
+
+		// Force a proofread check
+		const tr = view.state.tr;
+		tr.setMeta('forceProofread', true);
+		view.dispatch(tr);
+	}
+}
 
 export function createProofreadPlugin(
 	debounceTimeMS: number,
-	generateProofreadErrors: (text: string) => GenerateProofreadErrorsResponse | Promise<GenerateProofreadErrorsResponse>,
+	generateProofreadErrors: (
+		text: string
+	) => GenerateProofreadErrorsResponse | Promise<GenerateProofreadErrorsResponse>,
 	createSuggestionBox: CreateSuggestionBox,
 	getSpellCheckEnabled: ReturnType<typeof createSpellCheckEnabledStore>,
 	getCustomText?: GetCustomText,
@@ -50,17 +126,30 @@ export function createProofreadPlugin(
 
 	function showSuggestionBox(
 		event: MouseEvent,
-		errorDetails: Problem,
+		errors: Problem[],
 		view: EditorView,
 		decor: Decoration
 	) {
-		const errorKey = generateErrorKey(errorDetails);
+		// Pass all errors in the segment to the suggestion box
+		// The first error is also passed separately for backwards compatibility
+		const errorDetails = errors[0];
 
 		const rect = (event.target as HTMLElement).getBoundingClientRect();
 
 		const app = createSuggestionBox({
 			error: errorDetails,
+			errors: errors, // Pass all errors in this segment
 			position: { x: rect.left, y: rect.bottom },
+			invalidateCache: () => {
+				// Invalidate cache and force re-check
+				const pluginState = spellcheckkey.getState(view.state);
+				if (pluginState) {
+					pluginState.cacheMap.clear();
+					const tr = view.state.tr;
+					tr.setMeta('forceProofread', true);
+					view.dispatch(tr);
+				}
+			},
 			onReplace: (value: string | any[]) => {
 				const { from, to } = decor;
 				const tr = view.state.tr;
@@ -69,10 +158,16 @@ export function createProofreadPlugin(
 				const newSelection = TextSelection.create(tr.doc, from, from + value.length);
 				const pluginState = spellcheckkey.getState(view.state);
 
+				// Remove the decoration for this segment (which contains all errors in the segment)
+				const errorKeys = decor.spec.keys;
 				pluginState.decor = pluginState.decor.remove(
-					pluginState.decor
-						.find(from, to)
-						.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
+					pluginState.decor.find(from, to).filter((decoration: { spec: { keys: string[] } }) => {
+						// Remove decorations that match any of the keys in this segment
+						return (
+							decoration.spec.keys &&
+							decoration.spec.keys.some((k: string) => errorKeys.includes(k))
+						);
+					})
 				);
 				tr.setSelection(newSelection);
 				view.dispatch(tr);
@@ -81,12 +176,23 @@ export function createProofreadPlugin(
 			onIgnore: () => {
 				const pluginState = spellcheckkey.getState(view.state);
 				const { from, to } = decor;
+
+				// Mark all errors in this segment as ignored
+				errors.forEach((error) => {
+					pluginState.ignoredErrors.set(generateErrorKey(error), true);
+				});
+
+				// Remove the decoration for this segment
+				const errorKeys = decor.spec.keys;
 				pluginState.decor = pluginState.decor.remove(
-					pluginState.decor
-						.find(from, to)
-						.filter((decoration: { spec: { key: string } }) => decoration.spec.key === errorKey)
+					pluginState.decor.find(from, to).filter((decoration: { spec: { keys: string[] } }) => {
+						return (
+							decoration.spec.keys &&
+							decoration.spec.keys.some((k: string) => errorKeys.includes(k))
+						);
+					})
 				);
-				pluginState.ignoredErrors.set(errorKey, true);
+
 				const tr = view.state.tr;
 				tr.setMeta('proofread', pluginState);
 				view.dispatch(tr);
@@ -129,7 +235,8 @@ export function createProofreadPlugin(
 				msg: error.message,
 				shortmsg: error.shortMessage,
 				type: error.type.typeName,
-				replacements: error.replacements
+				replacements: error.replacements,
+				text: text.substring(error.offset, error.offset + error.length)
 			});
 		}
 		return problems;
@@ -142,21 +249,33 @@ export function createProofreadPlugin(
 	) {
 		const decorations: Decoration[] = [];
 		const processErrors = (errors: any[], offset: number, ignoredErrors: Map<string, boolean>) => {
-			errors.forEach((error) => {
-				const errorKey = generateErrorKey(error);
-				if (!ignoredErrors.has(errorKey)) {
-					const classname = useCustomCSS 
-						? `proofread-${error.type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
-						: error.type === 'UnknownWord' ? 'spelling-error' : 'spelling-warning';
-					decorations.push(
-						Decoration.inline(
-							error.from + offset,
-							error.to + offset,
-							{ class: classname },
-							{ error, key: errorKey }
-						)
-					);
-				}
+			// Filter out ignored errors first
+			const activeErrors = errors.filter((error) => !ignoredErrors.has(generateErrorKey(error)));
+
+			// Convert overlapping errors to non-overlapping segments
+			const segments = toSegments(activeErrors);
+
+			segments.forEach((segment) => {
+				// Determine class name based on errors in the segment
+				// Priority: if any error is UnknownWord, use spelling-error, otherwise spelling-warning
+				const hasSpellingError = segment.errors.some((e) => e.type === 'UnknownWord');
+				const classname = useCustomCSS
+					? `proofread-${segment.errors[0].type.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+					: hasSpellingError
+						? 'spelling-error'
+						: 'spelling-warning';
+
+				// Generate keys for all errors in this segment
+				const errorKeys = segment.errors.map(generateErrorKey);
+
+				decorations.push(
+					Decoration.inline(
+						segment.from + offset,
+						segment.to + offset,
+						{ class: classname },
+						{ errors: segment.errors, keys: errorKeys }
+					)
+				);
 			});
 		};
 
@@ -251,7 +370,8 @@ export function createProofreadPlugin(
 
 				const forceProofread = tr.getMeta('forceProofread');
 
-				if (!tr.docChanged && spellcheckEnabled === old.spellcheckEnabled && !forceProofread) return old;
+				if (!tr.docChanged && spellcheckEnabled === old.spellcheckEnabled && !forceProofread)
+					return old;
 
 				getOldNodes([tr], oldState).forEach((changednode) => {
 					old.cacheMap.delete(generateNodeKey(changednode.node));
@@ -294,7 +414,9 @@ export function createProofreadPlugin(
 				const decorationsAtPos = decorationSet.find(pos, pos);
 
 				if (decorationsAtPos && decorationsAtPos.length >= 1) {
-					showSuggestionBox(event, decorationsAtPos[0].spec.error, view, decorationsAtPos[0]);
+					// Now we pass the errors array instead of a single error
+					const errors = decorationsAtPos[0].spec.errors;
+					showSuggestionBox(event, errors, view, decorationsAtPos[0]);
 				} else {
 					const existingBox = document.querySelector('.proofread-suggestion');
 					if (existingBox) {

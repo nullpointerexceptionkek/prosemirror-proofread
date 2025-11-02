@@ -8,7 +8,7 @@ export interface ProofreadError {
 	type: {
 		typeName: 'UnknownWord' | string; // The type of the error (e.g., grammar, spelling)
 	};
-	replacements?: string[]; // Possible replacement suggestions for the error
+	replacements?: Array<{ value: string } | string>; // Possible replacement suggestions (LanguageTool format or plain strings)
 }
 
 export interface GenerateProofreadErrorsResponse {
@@ -21,8 +21,15 @@ export type Problem = {
 	msg: string;
 	shortmsg: string;
 	type: string;
-	replacements: string[];
+	replacements: Array<{ value: string } | string>; // Array of replacement suggestions (objects with value property or plain strings)
+	text: string; // The actual text content of the error
 };
+
+export interface Segment {
+	from: number;
+	to: number;
+	errors: Problem[];
+}
 
 interface Position {
 	x: number; // Horizontal position (e.g., event.clientX)
@@ -38,13 +45,19 @@ type OnIgnoreCallback = () => void;
 // Type for the callback function for closing the suggestion box.
 type OnCloseCallback = () => void;
 
+// Type for the callback function for invalidating the proofread cache.
+// Useful after adding words to a custom dictionary or changing proofreading rules.
+type OnInvalidateCacheCallback = () => void;
+
 // Full type representing the argument object for createSuggestionBox.
 interface SuggestionBoxOptions {
-	error: Problem; // Details about the error being addressed
+	error: Problem; // Details about the error being addressed (first error in segment for backwards compatibility)
+	errors: Problem[]; // All errors in the segment (for overlapping error support)
 	position: Position; // Position for displaying the suggestion box
 	onReplace: OnReplaceCallback; // Callback function to handle replacement
 	onIgnore: OnIgnoreCallback; // Callback function to handle ignoring an error
 	onClose: OnCloseCallback; // Callback function to handle closing the suggestion box
+	invalidateCache: OnInvalidateCacheCallback; // Callback function to invalidate the cache and force re-check
 }
 type Destroy = {
 	destroy: () => void;

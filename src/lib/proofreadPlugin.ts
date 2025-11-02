@@ -206,17 +206,24 @@ export function createProofreadPlugin(
 		return app;
 	}
 
-	function containsOnlyTextNodes(node: ProseMirrorNode) {
-		let onlyText = true;
+	function shouldProofreadNode(node: ProseMirrorNode) {
+		// Only proofread block nodes that can contain text (paragraph, heading, etc.)
+		// Skip nodes that are primarily structural or contain non-text content
+		if (!node.isBlock) {
+			return false;
+		}
 
+		// Check if the node has any non-inline children (nested blocks)
+		let hasNestedBlocks = false;
 		node.forEach((child) => {
-			if (!child.isText && child.type.name !== 'inline_math') {
-				onlyText = false;
+			if (child.isBlock) {
+				hasNestedBlocks = true;
 				return false;
 			}
 		});
 
-		return onlyText;
+		// If it has nested blocks, let those blocks be processed individually
+		return !hasNestedBlocks;
 	}
 
 	async function proofread(text: string): Promise<Problem[]> {
@@ -281,8 +288,11 @@ export function createProofreadPlugin(
 
 		const tasks: (() => Promise<void>)[] = [];
 		doc.descendants((node, pos) => {
-			if (!containsOnlyTextNodes(node)) {
-				return true;
+			// shouldProofreadNode returns true for block nodes without nested blocks (e.g., paragraphs)
+			// return true here means "continue to children" - this allows descending into lists, tables, etc.
+			// return false means "stop this branch" - prevents further descent after processing a node
+			if (!shouldProofreadNode(node)) {
+				return true; // Skip this node, but continue to children (e.g., descend into lists/tables)
 			}
 			tasks.push(async () => {
 				if (node.textContent && node.textContent.length > 1) {

@@ -21,7 +21,7 @@ This library is designed to work on all frameworks.
 - **Reactive Spell Check Enable/Disable**: Built-in functionality to easily toggle spell-checking on or off.
 
 
-We offer a default UI box as shown in the demo link:[https://nullpointerexceptionkek.github.io/prosemirror-proofread/]
+We offer a default UI box as shown in the demo link:[https://louisqli.github.io/prosemirror-proofread/]
 
 ## Usage
 
